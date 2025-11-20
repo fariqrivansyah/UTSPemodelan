@@ -1,14 +1,45 @@
 import streamlit as st
 import numpy as np
-import matplotlib
-matplotlib.use("Agg")   # <-- WAJIB untuk Streamlit Cloud
-import matplotlib.pyplot as plt
 from scipy.integrate import odeint
-import io
-import base64
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
-app = Flask(__name__)
+st.title("📢 Simulasi Penyebaran Informasi Hoaks di Media Sosial (Model SIR Termodifikasi)")
 
+st.write("""
+Model SIR termodifikasi digunakan untuk mensimulasikan penyebaran hoaks dengan empat kompartemen:
+- **S**: Susceptible (rentan terpapar hoaks)
+- **I**: Infected (menyebarkan hoaks)
+- **R**: Recovered (sadar bahwa itu hoaks)
+- **H**: Hoax Believer (percaya hoaks jangka panjang)
+
+Persamaan model:
+
+dS/dt = – β S I  
+dI/dt = β S I – γ I – α I  
+dR/dt = γ I  
+dH/dt = α I
+""")
+
+# -------------------------
+# Input parameter via Streamlit
+# -------------------------
+beta = st.slider("Tingkat Penyebaran Hoaks (β)", 0.01, 1.0, 0.5)
+gamma = st.slider("Tingkat Penyadaran Anti-Hoaks (γ)", 0.01, 1.0, 0.2)
+alpha = st.slider("Tingkat Menjadi Pemercaya Hoaks (α)", 0.01, 1.0, 0.1)
+
+S0 = st.number_input("Populasi Rentan Awal (S0)", 0, 10000, 9900)
+I0 = st.number_input("Populasi Terpapar Hoaks Awal (I0)", 0, 10000, 50)
+R0 = st.number_input("Populasi Sadar Hoaks (R0)", 0, 10000, 0)
+H0 = st.number_input("Pemercaya Hoaks Awal (H0)", 0, 10000, 50)
+
+# Waktu simulasi
+t = np.linspace(0, 50, 300)
+
+# -------------------------
+# Model SIR termodifikasi
+# -------------------------
 def modified_sir(y, t, beta, gamma, alpha):
     S, I, R, H = y
     dSdt = -beta * S * I
@@ -17,48 +48,26 @@ def modified_sir(y, t, beta, gamma, alpha):
     dHdt = alpha * I
     return [dSdt, dIdt, dRdt, dHdt]
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    graph_url = None
+y0 = [S0, I0, R0, H0]
+solution = odeint(modified_sir, y0, t, args=(beta, gamma, alpha))
+S, I, R, H = solution.T
 
-    if request.method == 'POST':
-        # Ambil input user
-        beta = float(request.form['beta'])
-        gamma = float(request.form['gamma'])
-        alpha = float(request.form['alpha'])
-        S0 = float(request.form['S0'])
-        I0 = float(request.form['I0'])
-        duration = int(request.form['duration'])
+# -------------------------
+# Plot grafik
+# -------------------------
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(t, S, label="Susceptible")
+ax.plot(t, I, label="Infected (Hoax Spreaders)")
+ax.plot(t, R, label="Recovered (Aware)")
+ax.plot(t, H, label="Hoax Believers")
+ax.set_xlabel("Waktu")
+ax.set_ylabel("Populasi")
+ax.set_title("Simulasi Penyebaran Hoaks Menggunakan Model SIR Termodifikasi")
+ax.legend()
 
-        R0 = 0.0
-        H0 = 0.0
-        y0 = [S0, I0, R0, H0]
+st.pyplot(fig)
 
-        t = np.linspace(0, duration, 300)
 
-        result = odeint(modified_sir, y0, t, args=(beta, gamma, alpha))
-        S, I, R, H = result.T
-
-        # Plot
-        plt.figure(figsize=(8,5))
-        plt.plot(t, S, label='S', linewidth=2)
-        plt.plot(t, I, label='I', linewidth=2)
-        plt.plot(t, R, label='R', linewidth=2)
-        plt.plot(t, H, label='H', linewidth=2)
-        plt.xlabel("Waktu")
-        plt.ylabel("Proporsi Populasi")
-        plt.title("Simulasi Penyebaran Hoaks (SIR Termodifikasi)")
-        plt.grid(True)
-        plt.legend()
-
-        # Simpan ke base64
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
-        graph_url = base64.b64encode(buffer.getvalue()).decode()
-        plt.close()
-
-    return render_template("index.html", graph_url=graph_url)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    
+      
+    
